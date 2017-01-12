@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="format-detection" content="telephone=no" />
+		<link rel="stylesheet" href="css/jquery.mobile-1.2.0.css"/>
+		<script src="js/jquery-1.8.3.js"></script>
+		<script>
+			$(document).on( "mobileinit", function() {
+			    // Make your jQuery Mobile framework configuration changes here!
+				$.support.cors = true;
+			    $.mobile.allowCrossDomainPages = true;
+			    $.mobile.button.prototype.corners = false;
+				
+			    $('#home').live('pageshow',function() {
+					$("#twitterbutton").unbind("vclick").bind("vclick",function(){
+						if(connectionstate != 'No network connection'){
+							var accesstoken = window.localStorage.getItem("accesstoken");
+							if(!accesstoken){
+								//alert("request init");
+								InitializeOAuth("twitter");
+									
+								//get request token logic
+								var ck = appOAuthNode.twitter.getConsumerkey();
+								var cs = appOAuthNode.twitter.getConsumersecret();
+								var requestUrl = "https://api.twitter.com/oauth/request_token";
+								var oauthsignaturemethod = appOAuthNode.twitter.getOAuthSignaturemethod();
+								var oauthversion = appOAuthNode.twitter.getOAuthVersion();
+								var oauthcallbackurl = "oob";
+								
+								var local_accessor = { consumerKey:ck, consumerSecret:cs, token:'', tokenSecret:'' };
+								
+								var message = {};
+								message.action = requestUrl;
+								message.method = "GET";
+								
+								OAuth.setTimestampAndNonce(message);
+								OAuth.setParameter(message, "oauth_consumer_key", ck);
+								OAuth.setParameter(message, "oauth_signature_method", oauthsignaturemethod);
+								OAuth.setParameter(message, "oauth_version", oauthversion);
+								OAuth.setParameter(message, "oauth_callback", oauthcallbackurl);
+								OAuth.SignatureMethod.sign(message, local_accessor);
+								
+								requestUrl = OAuth.addToURL(requestUrl, message.parameters);
+								
+
+								//make it cross domain call - cloud call	
+								
+								var url = 'http://mobiletweetoffline.appspot.com/mobileapp?source='+message.action+'&oauth_timestamp='+OAuth.percentEncode(message.parameters.oauth_timestamp)+'&oauth_nonce='+OAuth.percentEncode(message.parameters.oauth_nonce)+
+								'&oauth_consumer_key='+OAuth.percentEncode(message.parameters.oauth_consumer_key)+
+								'&oauth_signature_method='+OAuth.percentEncode(message.parameters.oauth_signature_method)+'&oauth_version='+OAuth.percentEncode(message.parameters.oauth_version)+
+								'&oauth_callback='+OAuth.percentEncode(message.parameters.oauth_callback)+'&oauth_signature='+OAuth.percentEncode(message.parameters.oauth_signature)+'&jsoncallback=?';
+								
+								$.ajax({
+									type: 'GET',
+									url : url,
+									contentType: "application/json",
+									dataType: 'jsonp',
+									cache : false,
+									crossDomain: true,
+									success : function(result){
+										//alert("request success");
+										var root = result;
+										var requesttoken   = root.oauth_token;
+										var requesttokensecret   = root.oauth_token_secret;
+										var requestcallbackconfirmed   = root.oauth_callback_confirmed;
+										
+										
+										//set these tokens to appOAuthNode.twitter object
+										appOAuthNode.twitter.setRequesttoken(requesttoken);
+										appOAuthNode.twitter.setRequesttokensecret(requesttokensecret);
+										$.mobile.changePage($("#pin"), { transition: "flip"} );
+										var authUrl = 'https://api.twitter.com/oauth/authorize?oauth_token='+requesttoken; 
+										//alert("before auth open");
+										twitterLogin(authUrl);
+									},
+									error : function(xhr,status,error){
+										//alert("request failre");
+										$("#positionWindow").popup("open");
+										$("#positionWindow").unbind("popupafterclose").bind("popupafterclose",function(event, ui) { 
+											
+										});
+									},
+									cache :false
+									
+								});
+							}else{
+								//set all the tokens here
+								InitializeOAuth("twitter");
+								appOAuthNode.twitter.setAccesstoken(window.localStorage.getItem("accesstoken"));
+							    appOAuthNode.twitter.setAccesstokensecret(window.localStorage.getItem("accesstokensecret"));
+								$.mobile.changePage($("#tweetonline"), { transition: "flip"} );
+							}
+						}else{
+							var accesstoken = window.localStorage.getItem("accesstoken");
+							if(!accesstoken){
+								$.mobile.changePage($("#home"), { transition: "flip"} );
+							}else{
+								//set all the tokens here
+								InitializeOAuth("twitter");
+								appOAuthNode.twitter.setAccesstoken(window.localStorage.getItem("accesstoken"));
+							    appOAuthNode.twitter.setAccesstokensecret(window.localStorage.getItem("accesstokensecret"));
+								$.mobile.changePage($("#tweetoffline"), { transition: "flip"} );
+							}
+						}
+					});
+					
+				});	
+			    
+			    $('#pin').live('pageshow',function() {
+			    	$("#pin-tweet").unbind("vclick").bind("vclick",function(){
+						//alert("pin click");
+						var mypin = $("#pin-mytweet").val();
+						//get the access tokens here
+						
+						var cs = appOAuthNode.twitter.getConsumersecret();
+						var ck = appOAuthNode.twitter.getConsumerkey();
+						var ak = appOAuthNode.twitter.getRequesttoken();
+						var as = appOAuthNode.twitter.getRequesttokensecret();
+						var av = mypin;
+								
+						var oauth_signature_method = appOAuthNode.twitter.getOAuthSignaturemethod();
+						var oauth_version = appOAuthNode.twitter.getOAuthVersion();
+						var requestUrl = "https://api.twitter.com/oauth/access_token";
+						
+						var local_accessor = { consumerKey:ck, consumerSecret:cs, token:ak, tokenSecret:as};
+						var message = {};
+		
+						message.action = requestUrl;
+						message.method = "GET";
+						OAuth.setTimestampAndNonce(message);
+						OAuth.setParameter(message, "oauth_consumer_key", ck);
+						OAuth.setParameter(message, "oauth_token", ak);
+						OAuth.setParameter(message, "oauth_signature_method", oauth_signature_method);
+						OAuth.setParameter(message, "oauth_version", oauth_version);
+						OAuth.setParameter(message, "oauth_verifier", av);
+						OAuth.SignatureMethod.sign(message, local_accessor);
+						
+						requestUrl = OAuth.addToURL(requestUrl, message.parameters);
+						
+
+						
+						var url = 'http://mobiletweetoffline.appspot.com/mobileaccess?source='+message.action+'&oauth_timestamp='+OAuth.percentEncode(message.parameters.oauth_timestamp)+'&oauth_nonce='+OAuth.percentEncode(message.parameters.oauth_nonce)+
+						'&oauth_consumer_key='+OAuth.percentEncode(message.parameters.oauth_consumer_key)+
+						'&oauth_signature_method='+OAuth.percentEncode(message.parameters.oauth_signature_method)+'&oauth_version='+OAuth.percentEncode(message.parameters.oauth_version)+
+						'&oauth_token='+OAuth.percentEncode(message.parameters.oauth_token)+'&oauth_verifier='+OAuth.percentEncode(message.parameters.oauth_verifier)+'&oauth_signature='+OAuth.percentEncode(message.parameters.oauth_signature)+'&jsoncallback=?';;
+						
+						
+						$.ajax({
+							type: 'GET',
+							url : url,
+							contentType: "application/json",
+			                dataType: 'jsonp',
+							cache : false,
+							crossDomain: true,
+							success : function(result){
+								//alert("sucess");
+								var root = result;
+								
+								var accesstoken   = root.oauth_token;
+							    var accesstokensecret   = root.oauth_token_secret;
+							    var userId   = root.user_id;
+							    var screenName = root.screen_name;
+							   
+							    //set the access tokens
+							    appOAuthNode.twitter.setAccesstoken(accesstoken);
+							    appOAuthNode.twitter.setAccesstokensecret(accesstokensecret);
+								window.localStorage.setItem("accesstoken",accesstoken);
+								window.localStorage.setItem("accesstokensecret",accesstokensecret);
+								window.localStorage.setItem("userId",userId);
+								window.localStorage.setItem("screenName",screenName);
+								
+							    $.mobile.changePage($("#tweetonline"), { transition: "flip"} );
+							    
+							},
+							error : function(xhr,status,error){
+								//alert("failure");
+							}
+							
+						});
+						
+					});
+					
+					$("#pin-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#pin-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#pin-refresh").unbind("vclick").bind("vclick",function(){
+						$("#pin-mytweet").val("");
+					});
+					
+				});
+			    
+				$('#tweetonline').live('pageshow',function() {
+					//get the profile details
+					getProfileDetails();
+					
+					var synStatus = window.localStorage.getItem("synStatus");
+					if(synStatus){
+						var userid = window.localStorage.getItem("userId");
+						if(synStatus == "yes"){
+							postofflinetweets(true,userid);
+						}
+					}
+					
+					//auto sync the offline tweets
+					var synStatus = window.localStorage.getItem("synStatus");
+					if(synStatus){
+						if(synStatus == "yes"){
+							//auto sync the offline tweets
+						}
+					}
+					
+					$("#online-tweet").unbind("vclick").bind("vclick",function(){
+						var mytweet = $("#online-mytweet").val();
+						var islocation = $("#appendLocation").attr("checked");
+						if(islocation == "checked"){
+							//get the current location and add to tweet
+							getCurrentLocation();
+							var currentLocation = window.localStorage.getItem("dynamicLocation");
+							//alert(currentLocation);
+							if(currentLocation){
+								mytweet = mytweet + " " + "Location:" + currentLocation;
+							}
+							//alert(mytweet);
+						}
+						postTweet(mytweet,true,"callbacktweet");
+					});
+
+					
+					$("#online-sync").unbind("vclick").bind("vclick",function(){
+						var userid = window.localStorage.getItem("userId");
+						postofflinetweets(false,userid);
+					});
+					
+					$("#online-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					
+					$("#online-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					
+					$("#online-refresh").unbind("vclick").bind("vclick",function(){
+						getRefreshProfileDetails();
+					});
+					
+					$("#online-editprofile").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#editprofile"), { transition: "flip"} );
+					});
+					
+					$("#online-takepicture").unbind("vclick").bind("vclick",function(){
+						navigator.camera.getPicture(onOnlinePhotoDataSuccess, onOnlinePhotoDataFail, { quality: 50,destinationType: destinationType.DATA_URL });
+					});
+					
+					$("#online-upload").unbind("vclick").bind("vclick",function(){
+						var userid = window.localStorage.getItem("userId");
+						var profileImageData = window.localStorage.getItem("currentProfilePhoto");
+						//post the online profile photo
+						alert("To be Implemented");
+					});
+					
+					
+				});
+				
+				$('#tweetoffline').live('pageshow',function() {
+					$("#offline-tweet").unbind("vclick").bind("vclick",function(){
+						var tweet = $("#offline-mytweet").val();
+						var userid = window.localStorage.getItem("userId");
+						//alert("alert before offline tweet");
+						//alert(tweet);
+						//alert(userid);
+						$("#offline-positionWindow").popup("open");
+						addOfflinetweet(userid,tweet);
+					});
+					
+					$("#offline-takepicture").unbind("vclick").bind("vclick",function(){
+						navigator.camera.getPicture(onOfflinePhotoDataSuccess, onOfflinePhotoDataFail, { quality: 50,destinationType: destinationType.DATA_URL });
+					});
+					
+					$("#offline-upload").unbind("vclick").bind("vclick",function(){
+						var userid = window.localStorage.getItem("userId");
+						var profileImageData = window.localStorage.getItem("currentProfilePhoto");
+						addOfflineProfilePhoto(userid,profileImageData);
+					});
+					
+					$("#offline-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					
+					$("#offline-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+
+					$("#offline-update").unbind("change").bind("change",function(){
+						var synStatus = $(this).val();
+						window.localStorage.setItem("synStatus",synStatus);
+					});
+					
+				});
+				
+				$('#profilecolor').live('pageshow',function() {
+			    	$("#profilecolor-update").unbind("vclick").bind("vclick",function(){
+						var myprofilecolor = $("#profilecolor-myupdate").val();
+						$.mobile.loading('show');
+						postProfileColor(myprofilecolor,"callbackprofilecolor");
+						
+					});
+			    	$("#profilecolor-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#profilecolor-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#profilecolor-refresh").unbind("vclick").bind("vclick",function(){
+						//get the latest profile color
+					});
+				});
+				
+				$('#screenname').live('pageshow',function() {
+					getNameProfileDetails();
+			    	$("#screenname-update").unbind("vclick").bind("vclick",function(){
+						var myScreenname = $("#screenname-myupdate").val();
+						$.mobile.loading('show');
+						//alert(myScreenname);
+						postScreenName(myScreenname,"callbackscreenname");
+						
+					});
+			    	$("#screenname-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#screenname-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#screenname-refresh").unbind("vclick").bind("vclick",function(){
+						//get the latest screen name
+					});
+				});
+				
+				$('#location').live('pageshow',function() {
+					getLocationProfileDetails();
+			    	$("#location-update").unbind("vclick").bind("vclick",function(){
+						var mylocation = $("#location-myupdate").val();
+						$.mobile.loading('show');
+						postLocation(mylocation,"callbacklocation");
+						
+					});
+			    	$("#location-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#location-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					$("#location-refresh").unbind("vclick").bind("vclick",function(){
+						// get the latest location
+					});
+				});
+				
+				$('#settings').live('pageshow',function() {
+
+					$("#settings-home").unbind("vclick").bind("vclick",function(){
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					
+					$("#settings-logout").unbind("vclick").bind("vclick",function(){
+						window.localStorage.clear();
+						$.mobile.changePage($("#home"), { transition: "flip"} );
+					});
+					
+					$("#notifications-update").unbind("change").bind("change",function(){
+						var notificationStatus = $(this).val();
+						window.localStorage.setItem("notificationStatus",notificationStatus);
+					});
+					
+					
+					$("#atheme").unbind("vclick").bind("vclick",function(){
+						//change the colors of all buttons
+						
+						//twitter online page
+						$("#online-home").buttonMarkup({ theme: "a" });
+						$("#online-refresh").buttonMarkup({ theme: "a" });
+						$("#online-logout").buttonMarkup({ theme: "a" });
+						$("#online-sync").buttonMarkup({ theme: "a" });
+						$("#online-tweet").buttonMarkup({ theme: "a" });
+						$("#online-editprofile").buttonMarkup({ theme: "a" });
+						$("#online-takepicture").buttonMarkup({ theme: "a" });
+						$("#online-upload").buttonMarkup({ theme: "a" });
+						
+						
+						//twitter offline page
+						$("#offline-home").buttonMarkup({ theme: "a" });
+						$("#offline-logout").buttonMarkup({ theme: "a" });
+						$("#offline-tweet").buttonMarkup({ theme: "a" });
+						$("#offline-takepicture").buttonMarkup({ theme: "a" });
+						$("#offline-upload").buttonMarkup({ theme: "a" });
+						
+						// edit profile page
+						$("#editprofile-home").buttonMarkup({ theme: "a" });
+						$("#editprofile-refresh").buttonMarkup({ theme: "a" });
+						$("#editprofile-logout").buttonMarkup({ theme: "a" });
+						
+						//settings page
+						$("#settings-home").buttonMarkup({ theme: "a" });
+						$("#settings-logout").buttonMarkup({ theme: "a" });
+						
+						//profile color page
+						$("#profilecolor-home").buttonMarkup({ theme: "a" });
+						$("#profilecolor-refresh").buttonMarkup({ theme: "a" });
+						$("#profilecolor-logout").buttonMarkup({ theme: "a" });
+						$("#profilecolor-update").buttonMarkup({ theme: "a" });
+						
+						//screen name page 
+						$("#screenname-home").buttonMarkup({ theme: "a" });
+						$("#screenname-refresh").buttonMarkup({ theme: "a" });
+						$("#screenname-logout").buttonMarkup({ theme: "a" });
+						$("#screenname-update").buttonMarkup({ theme: "a" });
+						
+						//screen name page 
+						$("#location-home").buttonMarkup({ theme: "a" });
+						$("#location-refresh").buttonMarkup({ theme: "a" });
+						$("#location-logout").buttonMarkup({ theme: "a" });
+						$("#location-update").buttonMarkup({ theme: "a" });
+						
+						//pin page 
+						$("#pin-home").buttonMarkup({ theme: "a" });
+						$("#pin-refresh").buttonMarkup({ theme: "a" });
+						$("#pin-logout").buttonMarkup({ theme: "a" });
+						$("#pin-tweet").buttonMarkup({ theme: "a" });
+					});
+					
+					$("#btheme").unbind("vclick").bind("vclick",function(){
+						//change the colors of all buttons
+						
+						//twitter online page
+						$("#online-home").buttonMarkup({ theme: "b" });
+						$("#online-refresh").buttonMarkup({ theme: "b" });
+						$("#online-logout").buttonMarkup({ theme: "b" });
+						$("#online-sync").buttonMarkup({ theme: "b" });
+						$("#online-tweet").buttonMarkup({ theme: "b" });
+						$("#online-editprofile").buttonMarkup({ theme: "b" });
+						$("#online-takepicture").buttonMarkup({ theme: "b" });
+						$("#online-upload").buttonMarkup({ theme: "b" });
+						
+						//twitter offline page
+						$("#offline-home").buttonMarkup({ theme: "b" });
+						$("#offline-logout").buttonMarkup({ theme: "b" });
+						$("#offline-tweet").buttonMarkup({ theme: "b" });
+						$("#offline-takepicture").buttonMarkup({ theme: "b" });
+						$("#offline-upload").buttonMarkup({ theme: "b" });
+						
+						// edit profile page
+						$("#editprofile-home").buttonMarkup({ theme: "b" });
+						$("#editprofile-refresh").buttonMarkup({ theme: "b" });
+						$("#editprofile-logout").buttonMarkup({ theme: "b" });
+						
+						//settings page
+						$("#settings-home").buttonMarkup({ theme: "b" });
+						$("#settings-logout").buttonMarkup({ theme: "b" });
+						
+						//profile color page
+						$("#profilecolor-home").buttonMarkup({ theme: "b" });
+						$("#profilecolor-refresh").buttonMarkup({ theme: "b" });
+						$("#profilecolor-logout").buttonMarkup({ theme: "b" });
+						$("#profilecolor-update").buttonMarkup({ theme: "b" });
+						
+						//screen name page 
+						$("#screenname-home").buttonMarkup({ theme: "b" });
+						$("#screenname-refresh").buttonMarkup({ theme: "b" });
+						$("#screenname-logout").buttonMarkup({ theme: "b" });
+						$("#screenname-update").buttonMarkup({ theme: "b" });
+						
+						//screen name page 
+						$("#location-home").buttonMarkup({ theme: "b" });
+						$("#location-refresh").buttonMarkup({ theme: "b" });
+						$("#location-logout").buttonMarkup({ theme: "b" });
+						$("#location-update").buttonMarkup({ theme: "b" });
+						
+						//pin page 
+						$("#pin-home").buttonMarkup({ theme: "b" });
+						$("#pin-refresh").buttonMarkup({ theme: "b" });
+						$("#pin-logout").buttonMarkup({ theme: "b" });
+						$("#pin-tweet").buttonMarkup({ theme: "b" });
+					});
+					
+					$("#ctheme").unbind("vclick").bind("vclick",function(){
+						//change the colors of all buttons
+						
+						//twitter online page
+						$("#online-home").buttonMarkup({ theme: "c" });
+						$("#online-refresh").buttonMarkup({ theme: "c" });
+						$("#online-logout").buttonMarkup({ theme: "c" });
+						$("#online-sync").buttonMarkup({ theme: "c" });
+						$("#online-tweet").buttonMarkup({ theme: "c" });
+						$("#online-editprofile").buttonMarkup({ theme: "c" });
+						$("#online-takepicture").buttonMarkup({ theme: "c" });
+						$("#online-upload").buttonMarkup({ theme: "c" });
+						
+						//twitter offline page
+						$("#offline-home").buttonMarkup({ theme: "c" });
+						$("#offline-logout").buttonMarkup({ theme: "c" });
+						$("#offline-tweet").buttonMarkup({ theme: "c" });
+						$("#offline-takepicture").buttonMarkup({ theme: "c" });
+						$("#offline-upload").buttonMarkup({ theme: "c" });
+						
+						// edit profile page
+						$("#editprofile-home").buttonMarkup({ theme: "c" });
+						$("#editprofile-refresh").buttonMarkup({ theme: "c" });
+						$("#editprofile-logout").buttonMarkup({ theme: "c" });
+						
+						//settings page
+						$("#settings-home").buttonMarkup({ theme: "c" });
+						$("#settings-logout").buttonMarkup({ theme: "c" });
+						
+						//profile color page
+						$("#profilecolor-home").buttonMarkup({ theme: "c" });
+						$("#profilecolor-refresh").buttonMarkup({ theme: "c" });
+						$("#profilecolor-logout").buttonMarkup({ theme: "c" });
+						$("#profilecolor-update").buttonMarkup({ theme: "c" });
+						
+						//screen name page 
+						$("#screenname-home").buttonMarkup({ theme: "c" });
+						$("#screenname-refresh").buttonMarkup({ theme: "c" });
+						$("#screenname-logout").buttonMarkup({ theme: "c" });
+						$("#screenname-update").buttonMarkup({ theme: "c" });
+						
+						//screen name page 
+						$("#location-home").buttonMarkup({ theme: "c" });
+						$("#location-refresh").buttonMarkup({ theme: "c" });
+						$("#location-logout").buttonMarkup({ theme: "c" });
+						$("#location-update").buttonMarkup({ theme: "c" });
+						
+						//pin page 
+						$("#pin-home").buttonMarkup({ theme: "c" });
+						$("#pin-refresh").buttonMarkup({ theme: "c" });
+						$("#pin-logout").buttonMarkup({ theme: "c" });
+						$("#pin-tweet").buttonMarkup({ theme: "c" });
+					});
+					
+					$("#dtheme").unbind("vclick").bind("vclick",function(){
+						//change the colors of all buttons
+						
+						//twitter online page
+						$("#online-home").buttonMarkup({ theme: "d" });
+						$("#online-refresh").buttonMarkup({ theme: "d" });
+						$("#online-logout").buttonMarkup({ theme: "d" });
+						$("#online-sync").buttonMarkup({ theme: "d" });
+						$("#online-tweet").buttonMarkup({ theme: "d" });
+						$("#online-editprofile").buttonMarkup({ theme: "d" });
+						$("#online-takepicture").buttonMarkup({ theme: "d" });
+						$("#online-upload").buttonMarkup({ theme: "d" });
+						
+						//twitter offline page
+						$("#offline-home").buttonMarkup({ theme: "d" });
+						$("#offline-logout").buttonMarkup({ theme: "d" });
+						$("#offline-tweet").buttonMarkup({ theme: "d" });
+						$("#offline-takepicture").buttonMarkup({ theme: "d" });
+						$("#offline-upload").buttonMarkup({ theme: "d" });
+						
+						// edit profile page
+						$("#editprofile-home").buttonMarkup({ theme: "d" });
+						$("#editprofile-refresh").buttonMarkup({ theme: "d" });
+						$("#editprofile-logout").buttonMarkup({ theme: "d" });
+						
+						//settings page
+						$("#settings-home").buttonMarkup({ theme: "d" });
+						$("#settings-logout").buttonMarkup({ theme: "d" });
+						
+						//profile color page
+						$("#profilecolor-home").buttonMarkup({ theme: "d" });
+						$("#profilecolor-refresh").buttonMarkup({ theme: "d" });
+						$("#profilecolor-logout").buttonMarkup({ theme: "d" });
+						$("#profilecolor-update").buttonMarkup({ theme: "d" });
+						
+						//screen name page 
+						$("#screenname-home").buttonMarkup({ theme: "d" });
+						$("#screenname-refresh").buttonMarkup({ theme: "d" });
+						$("#screenname-logout").buttonMarkup({ theme: "d" });
+						$("#screenname-update").buttonMarkup({ theme: "d" });
+						
+						//screen name page 
+						$("#location-home").buttonMarkup({ theme: "d" });
+						$("#location-refresh").buttonMarkup({ theme: "d" });
+						$("#location-logout").buttonMarkup({ theme: "d" });
+						$("#location-update").buttonMarkup({ theme: "d" });
+						
+						//pin page 
+						$("#pin-home").buttonMarkup({ theme: "d" });
+						$("#pin-refresh").buttonMarkup({ theme: "d" });
+						$("#pin-logout").buttonMarkup({ theme: "d" });
+						$("#pin-tweet").buttonMarkup({ theme: "d" });
+					});
+					
+					$("#etheme").unbind("vclick").bind("vclick",function(){
+						//change the colors of all buttons
+						
+						//twitter online page
+						$("#online-home").buttonMarkup({ theme: "e" });
+						$("#online-refresh").buttonMarkup({ theme: "e" });
+						$("#online-logout").buttonMarkup({ theme: "e" });
+						$("#online-sync").buttonMarkup({ theme: "e" });
+						$("#online-tweet").buttonMarkup({ theme: "e" });
+						$("#online-editprofile").buttonMarkup({ theme: "e" });
+						$("#online-takepicture").buttonMarkup({ theme: "e" });
+						$("#online-upload").buttonMarkup({ theme: "e" });
+						
+						//twitter offline page
+						$("#offline-home").buttonMarkup({ theme: "e" });
+						$("#offline-logout").buttonMarkup({ theme: "e" });
+						$("#offline-tweet").buttonMarkup({ theme: "e" });
+						$("#offline-takepicture").buttonMarkup({ theme: "e" });
+						$("#offline-upload").buttonMarkup({ theme: "e" });
+						
+						// edit profile page
+						$("#editprofile-home").buttonMarkup({ theme: "e" });
+						$("#editprofile-refresh").buttonMarkup({ theme: "e" });
+						$("#editprofile-logout").buttonMarkup({ theme: "e" });
+						
+						//settings page
+						$("#settings-home").buttonMarkup({ theme: "e" });
+						$("#settings-logout").buttonMarkup({ theme: "e" });
+						
+						//profile color page
+						$("#profilecolor-home").buttonMarkup({ theme: "e" });
+						$("#profilecolor-refresh").buttonMarkup({ theme: "e" });
+						$("#profilecolor-logout").buttonMarkup({ theme: "e" });
+						$("#profilecolor-update").buttonMarkup({ theme: "e" });
+						
+						//screen name page 
+						$("#screenname-home").buttonMarkup({ theme: "e" });
+						$("#screenname-refresh").buttonMarkup({ theme: "e" });
+						$("#screenname-logout").buttonMarkup({ theme: "e" });
+						$("#screenname-update").buttonMarkup({ theme: "e" });
+						
+						//screen name page 
+						$("#location-home").buttonMarkup({ theme: "e" });
+						$("#location-refresh").buttonMarkup({ theme: "e" });
+						$("#location-logout").buttonMarkup({ theme: "e" });
+						$("#location-update").buttonMarkup({ theme: "e" });
+						
+						//pin page 
+						$("#pin-home").buttonMarkup({ theme: "e" });
+						$("#pin-refresh").buttonMarkup({ theme: "e" });
+						$("#pin-logout").buttonMarkup({ theme: "e" });
+						$("#pin-tweet").buttonMarkup({ theme: "e" });
+					});
+				});
+
+			});
+		</script>
+		<script src="js/jquery.mobile-1.2.0.js"></script>
+		<link rel="stylesheet" href="css/Datebox.css"/>
+		<script src="js/Datebox-core.js"></script>
+		<script src="js/Datebox.js"></script>
+		<script src="js/ManageOauth.js"></script>
+		<script src="js/jquery-cookie.js"></script>
+		<script src="js/jquery-json.js"></script>
+		<script src="js/OAuthDefinition.js"></script>
+		<script src="js/oauth.js"></script>
+		<script src="js/sha1.js"></script>
+		<script src="js/TwitterApp-Core.js"></script>
+		<script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+		<script type="text/javascript" src="phonegap.js"></script>
+		<script type="text/javascript" src="childbrowser.js"></script>
+		<script>
+		    document.addEventListener("deviceready", onDeviceReady, false);
+			var connectionstate = "";
+			var watchID = null;
+			var geocoder;
+			var pictureSource;   // picture source
+			var destinationType; // sets the format of returned value 
+
+	
+			function onDeviceReady() {
+				checkConnection();
+				window.setInterval(cachingUpdates,1000);
+				inittweetdb();
+				initGeoWatch();
+				initCamera();
+			}
+			
+			function initCamera(){
+				pictureSource = navigator.camera.PictureSourceType;
+				destinationType = navigator.camera.DestinationType;
+			}
+			
+			function onOfflinePhotoDataSuccess(imageData){
+				var profileImage = document.getElementById('offline-profileimage');
+				profileImage.style.display = 'block';
+				profileImage.src = "data:image/jpeg;base64," + imageData;
+				//put it in local storage
+				window.localStorage.setItem("currentProfilePhoto",imageData);
+			}
+			
+			function onOfflinePhotoDataFail(){
+				alert("camera stopped working");
+			}
+			
+			function onOnlinePhotoDataSuccess(imageData){
+				var profileImage = document.getElementById('online-profileimage');
+				profileImage.style.display = 'block';
+				profileImage.src = "data:image/jpeg;base64," + imageData;
+				//put it in local storage
+				window.localStorage.setItem("currentProfilePhoto",imageData);
+			}
+			
+			function onOnlinePhotoDataFail(){
+				alert("camera stopped working");
+			}
+			
+			function getAddress(position){
+				//only if online
+				checkConnection();
+				if(connectionstate != 'No network connection'){
+					geocoder = new google.maps.Geocoder();
+					var lat = position.coords.latitude;
+					var lng = position.coords.longitude;
+					var latlng = new google.maps.LatLng(lat, lng);
+					geocoder.geocode({'latLng': latlng}, function(results, status) {
+						if(status == google.maps.GeocoderStatus.OK){
+							if(results[0]){
+								var address = results[0].address_components;
+								var city;
+								$.each(address,function(index,value){
+									var type = value.types;
+									$.each(type,function(cityindex,cityvalue){
+										if(cityvalue == "locality"){
+											city = value.long_name;
+											return false;
+										}
+									});
+									if(city){
+										return false;
+									}
+								});
+								if(!city){
+									city = results[0].formatted_address;
+								}
+								window.localStorage.setItem("dynamicLocation",city);
+							}else{
+								window.localStorage.setItem("dynamicLocation","unknown");
+							}
+						}else {
+							window.localStorage.setItem("dynamicLocation","unknown");
+						}
+					});
+				}
+			}	
+			
+			function onGeolocationSuccess(position){
+				getAddress(position);
+				showNotification();
+			}
+			
+			function showNotification(){
+				var notificationStatus = window.localStorage.getItem("notificationStatus");
+				if(notificationStatus && notificationStatus == "yes"){
+					 navigator.notification.confirm(
+						'Do you want to update location',  // message
+						onLocationChange,              	   // callback to invoke with index of button pressed
+						'Update Location',            			   // title
+						'Update,Cancel'                           // buttonLabels
+					);
+				}
+			}
+			
+			function onLocationChange(buttonIndex){
+				if(buttonIndex == 1){
+					var dynamicloc = window.localStorage.getItem("dynamicLocation");
+					$("#location-myupdate").val(dynamicloc);
+					$.mobile.changePage($("#location"), { transition: "flip"} );
+				}else{
+					//close the dialog
+				}
+			}
+			
+			function onGeolocationError(error){
+				//alert(error.message);
+			}
+			
+			function initGeoWatch(){
+				var options = { timeout: 30000,enableHighAccuracy:true };
+				watchID = navigator.geolocation.watchPosition(onGeolocationSuccess, onGeolocationError, options);
+			}
+			
+			function getCurrentLocation(){
+				//alert("get current location invoked");
+				navigator.geolocation.getCurrentPosition(onCurrentLocationSuccess, onCurrentLocationError,{enableHighAccuracy:true });
+			}
+			
+			function onCurrentLocationSuccess(position){
+				getAddress(position);
+			}
+			
+			function onCurrentLocationError(error){
+				//alert(error.message);
+			}
+			
+			function checkConnection() {
+				var networkState = navigator.connection.type;
+
+				var states = {};
+				states[Connection.UNKNOWN]  = 'Unknown connection';
+				states[Connection.ETHERNET] = 'Ethernet connection';
+				states[Connection.WIFI]     = 'WiFi connection';
+				states[Connection.CELL_2G]  = 'Cell 2G connection';
+				states[Connection.CELL_3G]  = 'Cell 3G connection';
+				states[Connection.CELL_4G]  = 'Cell 4G connection';
+				states[Connection.NONE]     = 'No network connection';
+
+				connectionstate = states[networkState];	
+			}
+			
+			//initial creation of db
+			var db = "";
+			function inittweetdb(){
+				db = window.openDatabase("Database", "1.0", "offline tweets", 200000);
+				db.transaction(createDB, errorCreateCB, successCreateCB);
+			}
+			
+			function createDB(tx){
+				tx.executeSql('DROP TABLE IF EXISTS TWEET');
+				tx.executeSql('CREATE TABLE IF NOT EXISTS TWEET (userid,tweet)');
+				tx.executeSql('CREATE TABLE IF NOT EXISTS PROFILEPHOTO (userid,profilephoto)');
+			}
+
+			function errorCreateCB(err){
+				
+			}
+
+			function successCreateCB(){
+				
+			}
+			
+			function cachingUpdates(){
+				checkConnection();
+				var pageId = $.mobile.activePage.attr("id");
+				if(connectionstate == 'No network connection'){
+					if(pageId == "tweetonline"){
+						$.mobile.changePage($("#tweetoffline"), { transition: "flip"} );
+					}
+				}else{
+					if(pageId == "tweetoffline"){
+						$.mobile.changePage($("#tweetonline"), { transition: "flip"} );
+					}
+				}
+			}
+			
+			//insertion into db
+			function addOfflinetweet(userid,tweet){
+				db.transaction(function(tx){
+					tx.executeSql("INSERT INTO TWEET(userid,tweet) VALUES (?,?)",
+					[userid,tweet],
+					addTweetSuccess,
+					addTweetError);
+				 });
+			}
+
+			function addTweetSuccess(){
+				//alert("entry added successfully");
+			}		
+
+			function addTweetError(){
+				
+			}
+			
+			function addOfflineProfilePhoto(userid,profileImageData){
+				db.transaction(function(tx){
+					tx.executeSql("INSERT INTO PROFILEPHOTO(userid,profilephoto) VALUES (?,?)",
+					[userid,tweet],
+					addOfflinePhotoSuccess,
+					addOfflinePhotoError);
+				 });
+			}
+			
+			function addOfflinePhotoSuccess(){
+			}
+			
+			function addOfflinePhotoError(){
+			}
+			
+			//postoffline tweet
+			
+			function postofflinetweets(autoSync,userid){
+				//get all the offline tweets from the table
+				//alert(userid);
+				//alert(autoSync);
+				db.transaction(function(tx) {
+					if(autoSync){	
+						tx.executeSql("SELECT * FROM TWEET where userid='"+userid+"'", [], loadOfflineSyncTweetSuccess,
+								loadOfflineSyncTweetError);
+					}else{
+						tx.executeSql("SELECT * FROM TWEET where userid='"+userid+"'", [], loadOfflineTweetSuccess,
+								loadOfflineTweetError);
+					}
+				});
+				
+			}
+			
+			
+			
+			function loadOfflineTweetSuccess(tx,rs){
+				//alert(rs.rows.length);
+				if(rs.rows.length != 0){
+					for (var i=0; i < rs.rows.length; i++){
+						postTweet(rs.rows.item(i).tweet,true,"offlinetweetcallback");
+					}
+					//need to remove all the tweets from table
+					deleteOfflineTweets();
+					$.mobile.loading('hide');
+					$("#online-yesSync").popup("open");
+				}else{
+					$("#online-noSync").popup("open");
+				}
+			}
+			
+			function loadOfflineTweetError(tx,err){
+			}
+			
+			function loadOfflineSyncTweetSuccess(tx,rs){
+				if(rs.rows.length != 0){
+					for (var i=0; i < rs.rows.length; i++){
+						postTweet(rs.rows.item(i).tweet,true,"offlinetweetcallback");
+					}
+					//need to remove all the tweets from table
+					deleteOfflineTweets();
+				}
+			}
+			
+			function loadOfflineSyncTweetError(tx,err){
+				
+			}
+			
+			function offlinetweetcallback(response){
+				
+			}
+
+			//delete offline tweets
+			function deleteOfflineTweets(){
+				var userid = window.localStorage.getItem("userId");
+				db.transaction(function(tx){
+				tx.executeSql("DELETE FROM TWEET where userid='"+userid+"'", [],
+						onDeleteSuccess,
+						onDeleteError);
+				});	
+			}	
+			
+			function onDeleteSuccess(){
+				//alert("deleted");
+			}
+			
+			function onDeleteError(){
+				//alert("not deleted");
+			}
+			
+		</script>
+		
+		
+		
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi"/>
+
+		
+		
+    </head>
+    <body>
+		<div data-role="page" id="home" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Connect with</h1>
+			</div>
+			<div data-role="content">
+				<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="positionWindow">
+					<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+					<p>Failed to Login.Please try after sometime.</p>
+				</div>
+				<div>
+					<ul data-role="listview" data-theme="c">
+						<li>
+							<a href="#" id="twitterbutton">
+								<img alt="Twitter" src="img/twitter.png">
+								Twitter
+							</a>
+						</li>
+					</ul>
+				</div>
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="location" data-add-back-btn="true" data-back-btn-text="Back" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Location</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="location-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="location-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="location-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Location</h2>
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="location-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Location Updated</p>
+						</div>
+						<div data-role="fieldcontainer">
+							<input type="text" id="location-myupdate" name="updatelocation"/>
+							<input type="button" id="location-update" data-theme="b" data-inline="true" value="Update"/>
+						</div>
+					</div>
+				</div>	
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="screenname" data-add-back-btn="true" data-back-btn-text="Back" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Name</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="screenname-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="screenname-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="screenname-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Name</h2>
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="screenname-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Name updated</p>
+						</div>
+						<div data-role="fieldcontainer">
+							<input type="text" id="screenname-myupdate" name="updatescreenname"/>
+							<input type="button" id="screenname-update" data-theme="b" data-inline="true" value="Update"/>
+						</div>
+					</div>
+				</div>	
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="profilecolor" data-add-back-btn="true" data-back-btn-text="Back" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Profile Color</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="profilecolor-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="profilecolor-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="profilecolor-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Profile Color</h2>
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="profilecolor-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Profile background color updated</p>
+						</div>
+						<div data-role="fieldcontainer">
+							<input type="text" id="profilecolor-myupdate" name="updateprofilecolor"/>
+							<input type="button" id="profilecolor-update" data-theme="b" data-inline="true" value="Update"/>
+						</div>
+					</div>
+				</div>	
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="editprofile" data-add-back-btn="true" data-back-btn-text="Back" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Edit profile</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="editprofile-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="editprofile-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="editprofile-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<ul data-theme="d" data-role="listview">
+					<li><a href="#location">Edit Location</a><a href="#location"></a></li>
+					<li><a href="#screenname">Edit Name</a><a href="#screenname"></a></li>
+					<li><a href="#profilecolor">Edit Profile Color</a><a href="#profilecolor"></a></li>
+				</ul>
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="pin" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Authenticate App</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="pin-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="pin-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="pin-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Enter Pin</h2>
+						<div data-role="fieldcontainer">
+							<input type="text" id="pin-mytweet" name="pinmytweet"/>
+							<a href="javascript:void(0)" id="pin-tweet" data-role="button" data-theme="b" data-inline="true">Submit</a>
+						</div>
+					</div>
+				</div>	
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="settings" data-add-back-btn="true" data-back-btn-text="Back" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Settings</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="settings-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="settings-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Change Theme</h2>
+						<p>
+						    <a href="#" id="atheme" data-role="button" data-theme="a" data-inline="true"></a>
+						    <a href="#" id="btheme" data-role="button" data-theme="b" data-inline="true"></a>
+						    <a href="#" id="ctheme" data-role="button" data-theme="c" data-inline="true"></a>
+						    <a href="#" id="dtheme" data-role="button" data-theme="d" data-inline="true"></a>
+						    <a href="#" id="etheme" data-role="button" data-theme="e" data-inline="true"></a>
+						</p>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Notifications</h2>
+						<section class="ui-grid-a">
+							<div class="ui-block-b">
+								<select id="notifications-update" name="update" data-role="slider">
+									<option value="no">No</option>
+									<option value="yes">Yes</option>
+								</select>
+							</div>
+						</section>
+					</div>
+				</div>
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" data-theme="b" id="tweetonline">
+			<div data-role="header" data-position="fixed">
+				
+				<h1>Twitter online</h1>
+				<a href="#settings" class="ui-btn-right" data-icon="gear">Settings</a>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="online-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="online-sync" data-icon="refresh" data-theme="b">Sync</a></li>
+						<li><a href="javascript:void(0)" id="online-refresh" data-icon="refresh" data-theme="b">Refresh</a></li>
+						<li><a href="javascript:void(0)" id="online-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Tweet</h2>	
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="online-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Your tweet successfully sent</p>
+						</div>
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="online-noSync">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>You have no offline tweets</p>
+						</div>
+						
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="online-yesSync">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Your offline tweets are successfully sent</p>
+						</div>
+						<div data-role="fieldcontainer">
+							<textarea id="online-mytweet" name="mytweet"></textarea>
+							<section class="ui-grid-a">
+								<div class="ui-block-a">
+									<a href="javascript:void(0)" id="online-tweet" data-role="button" data-theme="b" data-inline="true">Tweet</a>
+								</div>
+								<div class="ui-block-b">
+									 <label for="appendLocation">Add Location</label>
+									<input type="checkbox" name="appendLocation" id="appendLocation" data-inline="true">
+								</div>
+							</section>
+						</div>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Upload Profile Photo</h2>	
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="onlinePhoto-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Your Profile photo updated</p>
+						</div>
+						<img style="display:none;width:60px;height:60px;" id="online-profileimage" src="" />
+						<div data-role="controlgroup" data-type="horizontal">
+							<a href="javascript:void(0)" data-theme="b" id="online-takepicture" data-role="button">Take picture</a>
+							<a href="javascript:void(0)" data-theme="b" id="online-upload" data-role="button">Upload</a>
+						</div>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Status</h2>	
+						<div data-theme="e" data-role="content">
+							<section class="ui-grid-a">
+								<div class="ui-block-a"><span>Last tweet:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-lasttweet"></span></div>
+							</section>
+						</div>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Profile</h2>	
+						<div data-theme="e" data-role="content">
+							<section class="ui-grid-a">
+								<div class="ui-block-a"><span>Name:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-name"></span></div>
+								
+								<div class="ui-block-a"><span>Screen Name:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-screenname"></span></div>
+								
+								<div class="ui-block-a"><span>Location:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-location"></span></div>
+								
+								<div class="ui-block-a"><span>User Id:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-uid"></span></div>
+								
+								<div class="ui-block-a"><span>Followers:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-followers"></span></div>
+								
+								<div class="ui-block-a"><span>Friends:&nbsp;</span></div>
+								<div class="ui-block-b"><span id="online-twitter-friends"></span></div>
+							</section>
+							<a href="javascript:void(0)" id="online-editprofile" data-role="button" data-theme="b" data-inline="true">Edit Profile</a>
+						</div>
+					</div>
+				</div>
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+		
+		<div data-role="page" id="tweetoffline" data-theme="b">
+			<div data-role="header" data-position="fixed">
+				<h1>Twitter offline</h1>
+				<div data-role="navbar">
+					<ul>
+						<li><a href="javascript:void(0)" id="offline-home" data-icon="home" data-theme="b">Home</a></li>
+						<li><a href="javascript:void(0)" id="offline-logout" data-icon="delete" data-theme="b">Logout</a></li>
+					</ul>
+				</div>
+			</div>
+			<div data-role="content">
+				<div data-role="collapsible-set" data-content-theme="d" data-collapsed-icon="arrow-r" data-expanded-icon="arrow-d">
+					<div data-role="collapsible" data-theme="c" data-collapsed="false">
+						<!-- Title and content -->
+						<h2>Tweet</h2>	
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="offline-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Your tweet will be sent</p>
+						</div>
+						<div data-role="fieldcontainer">
+							<textarea id="offline-mytweet" name="offlinemytweet"></textarea>
+							<input type="button" id="offline-tweet" data-theme="b" data-inline="true" value="Tweet"/>
+						</div>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Upload Profile Photo</h2>	
+						<div data-role="popup" data-theme="b" data-overlay-theme="a" data-position-to="origin" id="offlinePhoto-positionWindow">
+							<a href="#" data-rel="back" data-role="button" data-theme="a" data-icon="delete" data-iconpos="notext" class="ui-btn-right">Close</a>
+							<p>Your Profile photo will be updated</p>
+						</div>
+						<img style="display:none;width:60px;height:60px;" id="offline-profileimage" src="" />
+						<div data-role="controlgroup" data-type="horizontal">
+							<a href="javascript:void(0)" data-theme="b" id="offline-takepicture" data-role="button">Take picture</a>
+							<a href="javascript:void(0)" data-theme="b" id="offline-upload" data-role="button">Upload</a>
+						</div>
+					</div>
+					<div data-role="collapsible" data-theme="c" data-collapsed="true">
+						<!-- Title and content -->
+						<h2>Settings</h2>	
+						<!--  
+						<div data-role="fieldcontain">
+							<label for="update">Auto Sync</label>
+							<select id="offline-update" name="update" data-role="slider">
+								<option value="no">No</option>
+								<option value="yes">Yes</option>
+							</select>
+						</div>
+						-->
+						<div data-role="content">
+							<section class="ui-grid-a">
+								<div class="ui-block-a"><span>Auto Sync</span></div>
+								<div class="ui-block-b">
+									<select id="offline-update" name="update" data-role="slider">
+										<option value="no">No</option>
+										<option value="yes">Yes</option>
+									</select>
+								</div>
+							</section>
+						</div>
+						
+					</div>
+				</div>
+			</div>	
+			<div data-role="footer" data-position="fixed">
+				<h4></h4>
+			</div>
+		</div>
+	</body>
+</html>
